@@ -1,0 +1,248 @@
+module ALU #(parameter N = 8, parameter M = 4) (
+    input [N-1:0] A, B,
+    input clk, rst, cin, ce, mode,
+    input [1:0] valid,
+    input [M-1:0] cmd,
+    output reg [2*N:0] result = 16'd0,
+    output reg carry_out = 1'b0,
+    output reg overflow = 1'b0,
+    output reg gt = 1'b0,
+    output reg eq = 1'b0,
+    output reg lt = 1'b0,
+    output reg err = 1'b0
+);
+
+reg [N-1:0] next_A, next_B;
+reg [1:0] next_valid;
+reg [M-1:0] next_cmd;
+reg next_mode;
+reg next_cin;
+
+wire signed [N-1:0] signed_A = next_A;
+wire signed [N-1:0] signed_B = next_B;
+reg signed [2*N:0] signed_result;
+
+reg [2*N:0] next_result;
+reg next_cout, next_g, next_l, next_e, next_err, next_oflow;
+
+always @(posedge clk or posedge rst) begin
+    if (rst) begin
+        next_A <= 0;
+        next_B <= 0;
+        next_valid <= 0;
+        next_cmd <= 0;
+        next_mode <= 0;
+        next_cin <= 0;
+        next_err <= 0;
+    end else if (ce) begin
+        next_A <= A;
+        next_B <= B;
+        next_valid <= valid;
+        next_cmd <= cmd;
+        next_mode <= mode;
+        next_cin <= cin;
+    end
+end
+
+always @(*) begin
+    next_result = 0;
+    next_cout = 0;
+    next_oflow = 0;
+    next_g = 0;
+    next_e = 0;
+    next_l = 0;
+    next_err = 0;
+
+    if (ce) begin
+        if (next_mode) begin
+            if (next_valid == 2'b11) begin
+                case (next_cmd)
+                    4'b0000: begin
+                        next_result = next_A + next_B;
+                        next_cout = (next_result[N]) ? 1 : 0;
+                    end
+                    4'b0001: begin
+                        next_oflow = (next_A < next_B) ? 1 : 0;
+                        next_result = next_A - next_B;
+                    end
+                    4'b0010: begin
+                        next_result = next_A + next_B + next_cin;
+                        next_cout = (next_result[N]) ? 1 : 0;
+                    end
+                    4'b0011: begin
+                        next_oflow = (next_A < next_B) ? 1 : 0;
+                        next_result = next_A - next_B - next_cin;
+                        next_cout = (next_result[N]) ? 1 : 0;
+                    end
+                    4'b1000: begin
+                        if (next_A == next_B) begin
+                            next_e = 1;
+                            next_g = 0;
+                            next_l = 0;
+                        end else if (next_A < next_B) begin
+                            next_e = 0;
+                            next_g = 0;
+                            next_l = 1;
+                        end else begin
+                            next_e = 0;
+                            next_g = 1;
+                            next_l = 0;
+                        end
+                    end
+                    4'b1001: begin
+                        next_result = ((next_A + 1) * (next_B + 1));
+                    end
+                    4'b1010: begin
+                        next_result = ((next_A << 1) * (next_B));
+                    end
+                    4'b1011: begin
+                        signed_result = signed_A + signed_B;
+                        next_result = signed_result;
+                        next_oflow = (~(signed_A[N-1] ^ signed_B[N-1])) & (signed_result[N-1] ^ signed_A[N-1]);
+                        next_e = (signed_A == signed_B) ? 1 : 0;
+                        next_g = (signed_A > signed_B) ? 1 : 0;
+                        next_l = (signed_A < signed_B) ? 1 : 0;
+                    end
+                    4'b1100: begin
+                        signed_result = signed_A - signed_B;
+                        next_result = signed_result;
+                        next_oflow = (signed_A[N-1] ^ signed_B[N-1]) & (signed_result[N-1] ^ signed_A[N-1]);
+                        next_e = (signed_A == signed_B) ? 1 : 0;
+                        next_g = (signed_A > signed_B) ? 1 : 0;
+                        next_l = (signed_A < signed_B) ? 1 : 0;
+                    end
+                    default: begin
+                        next_result = 0;
+                        next_cout = 0;
+                        next_oflow = 0;
+                        next_g = 0;
+                        next_e = 0;
+                        next_l = 0;
+                        next_err = 0;
+                    end
+                endcase
+            end else if (next_valid == 2'b10) begin
+                case (next_cmd)
+                    4'b0100: begin
+                        next_result = next_A + 1;
+                        next_oflow = (next_result[N]) ? 1 : 0;
+                    end
+                    4'b0101: next_result = next_A - 1;
+                    default: begin
+                        next_result = 0;
+                        next_cout = 0;
+                        next_oflow = 0;
+                        next_g = 0;
+                        next_e = 0;
+                        next_l = 0;
+                        next_err = 1;
+                    end
+                endcase
+            end else if (next_valid == 2'b01) begin
+                case (next_cmd)
+                    4'b0110: next_result = next_B + 1;
+                    4'b0111: next_result = next_B - 1;
+                    default: begin
+                        next_result = 0;
+                        next_cout = 0;
+                        next_oflow = 0;
+                        next_g = 0;
+                        next_e = 0;
+                        next_l = 0;
+                        next_err = 1;
+                    end
+                endcase
+            end else begin
+                next_err = 1;
+            end
+        end else begin
+            if (next_valid == 2'b11) begin
+                case (next_cmd)
+                    4'b0000: next_result = {1'b0, next_A & next_B};
+                    4'b0001: next_result = {1'b0, ~(next_A & next_B)};
+                    4'b0010: next_result = {1'b0, next_A | next_B};
+                    4'b0011: next_result = {1'b0, ~(next_A | next_B)};
+                    4'b0100: next_result = {1'b0, next_A ^ next_B};
+                    4'b0101: next_result = {1'b0, ~(next_A ^ next_B)};
+                    4'b1100: begin
+                        if (next_B >= N) next_err = 1;
+                        else next_result = {1'b0, (next_A << next_B) | (next_A >> (N - next_B))};
+                    end
+                    4'b1101: begin
+                        if (next_B >= N) next_err = 1;
+                        else next_result = {1'b0, (next_A >> next_B) | (next_A << (N - next_B))};
+                    end
+                    default: begin
+                        next_result = 0;
+                        next_cout = 0;
+                        next_oflow = 0;
+                        next_g = 0;
+                        next_e = 0;
+                        next_l = 0;
+                        next_err = 1;
+                    end
+                endcase
+            end else if (next_valid == 2'b10) begin
+                case (next_cmd)
+                    4'b0110: next_result = {{(2*N-N){1'b0}}, ~next_A};
+                    4'b1000: next_result = {1'b0, next_A >> 1};
+                    4'b1001: next_result = {1'b0, next_A << 1};
+                    default: begin
+                        next_result = 0;
+                        next_cout = 0;
+                        next_oflow = 0;
+                        next_g = 0;
+                        next_e = 0;
+                        next_l = 0;
+                        next_err = 1;
+                    end
+                endcase
+            end else if (next_valid == 2'b01) begin
+                case (cmd)
+                    4'b0111: next_result = {{(2*N-N){1'b0}}, ~next_B};
+                    4'b1010: next_result = {1'b0, next_B >> 1};
+                    4'b1011: next_result = {1'b0, next_B << 1};
+                    default: begin
+                        next_result = 0;
+                        next_cout = 0;
+                        next_oflow = 0;
+                        next_g = 0;
+                        next_e = 0;
+                        next_l = 0;
+                        next_err = 1;
+                    end
+                endcase
+            end else begin
+                next_err = 1;
+            end
+        end
+    end
+end
+
+always @(posedge clk or posedge rst) begin
+    if (rst) begin
+        result <= 0;
+        carry_out <= 0;
+        overflow <= 0;
+        gt <= 0;
+        eq <= 0;
+        lt <= 0;
+        err <= 0;
+    end else if (ce) begin
+        if ((next_cmd == 9 || next_cmd == 10) && next_mode) begin
+            result <= next_result;
+        end else begin
+            result <= next_result;
+        end
+        carry_out <= next_cout;
+        overflow <= next_oflow;
+        gt <= next_g;
+        eq <= next_e;
+        lt <= next_l;
+        err <= next_err;
+    end
+end
+
+endmodule
+
+
