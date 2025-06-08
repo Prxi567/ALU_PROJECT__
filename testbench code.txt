@@ -46,11 +46,13 @@ module test_bench_alu #(parameter N=8, M=4, res_width = 2*N)();
   task read_stimulus();
     begin
       #10 $readmemb("stimulus.txt", stimulus_mem);
+      $display("[INFO] Stimulus loaded from stimulus.txt");
     end
   endtask
 
   always @(fetch_stimulus) begin
     curr_test_case = stimulus_mem[stim_mem_ptr];
+    $display("[FETCH] Testcase %0d: %b", stim_mem_ptr, curr_test_case);
     stim_mem_ptr = stim_mem_ptr + 1;
   end
 
@@ -71,6 +73,11 @@ module test_bench_alu #(parameter N=8, M=4, res_width = 2*N)();
       Comparison_EGL = curr_test_case[4:2];
       ov = curr_test_case[1];
       err = curr_test_case[0];
+
+      $display("[DRIVER] Feature ID: %b, A: %b, B: %b, CMD: %b, CIN: %b, CE: %b, MODE: %b, INP_VALID: %b",
+                Feature_ID, A, B, CMD, CIN, CE, MODE, INP_VALID);
+      $display("[DRIVER] Expected_RES: %b, COUT: %b, EGL: %b, OV: %b, ERR: %b",
+                Expected_RES, cout, Comparison_EGL, ov, err);
     end
   endtask
 
@@ -90,11 +97,14 @@ module test_bench_alu #(parameter N=8, M=4, res_width = 2*N)();
         response_packet[test_case_width +: 5] = {ERR, OFLOW, EGL, COUT};
         response_packet[test_case_width+5 +: 2*N+1] = RES;
         exact_data = {RES, COUT, EGL, OFLOW, ERR};
+
+        $display("[MONITOR] RES: %b, COUT: %b, EGL: %b, OVF: %b, ERR: %b", RES, COUT, EGL, OFLOW, ERR);
       end
     end
   endtask
 
   assign expected_data = {Expected_RES, cout, Comparison_EGL, ov, err};
+
   reg [scoreboard_width-1:0] scb_stimulus_mem [0:`no_of_testcase-1];
 
   task score_board();
@@ -107,9 +117,14 @@ module test_bench_alu #(parameter N=8, M=4, res_width = 2*N)();
       expected_res = curr_test_case[(test_case_width - 11 - 2*N - M) -: 2*N+1];
       response_data = response_packet[test_case_width +:(2*N+7)];
 
+      $display("[SCOREBOARD] Expected: %b", expected_data);
+      $display("[SCOREBOARD] Actual  : %b", exact_data);
+
       if (expected_data === exact_data) begin
+        $display("[RESULT] Test %0d PASSED", stim_stimulus_mem_ptr);
         scb_stimulus_mem[stim_stimulus_mem_ptr] = {1'b0, Feature_ID, expected_data, response_data, 1'b0, `PASS};
       end else begin
+        $display("[RESULT] Test %0d FAILED", stim_stimulus_mem_ptr);
         scb_stimulus_mem[stim_stimulus_mem_ptr] = {1'b0, Feature_ID, expected_data, response_data, 1'b0, `FAIL};
       end
       stim_stimulus_mem_ptr = stim_stimulus_mem_ptr + 1;
@@ -119,8 +134,10 @@ module test_bench_alu #(parameter N=8, M=4, res_width = 2*N)();
   task dut_reset();
     begin
       CE = 1;
+      $display("[RESET] DUT reset started");
       #10 RST = 1;
       #20 RST = 0;
+      $display("[RESET] DUT reset complete");
     end
   endtask
 
@@ -136,24 +153,27 @@ module test_bench_alu #(parameter N=8, M=4, res_width = 2*N)();
         pointer = pointer + 1;
       end
       $fclose(file_id);
+      $display("[INFO] Report generated: results.txt");
     end
   endtask
 
   initial begin
     #10;
-    $display("\n--- Starting ALU Verification ---");
+    $display("\n=== Starting ALU Verification ===");
     global_init();
-    dut_reset(); 
-
+    dut_reset();
     read_stimulus();
-    for (j = 0; j <= `no_of_testcase-1; j = j + 1) begin
+
+    for (j = 0; j <= `no_of_testcase - 1; j = j + 1) begin
+      $display("\n=====================");
+      $display("[TESTCASE] Executing Testcase %0d", j);
+      $display("=====================");
       fork
         driver();
         monitor();
       join
       score_board();
 
-    
       if (j == (`no_of_testcase / 2)) begin
         #20;
         $display("\n[INFO] Performing mid-test reset...");
@@ -163,9 +183,7 @@ module test_bench_alu #(parameter N=8, M=4, res_width = 2*N)();
 
     gen_report();
     $fclose(fid);
-    #100 $display("\n--- Verification Complete ---");
+    #100 $display("\n=== Verification Complete ===");
     $finish();
   end
 endmodule
-
-
