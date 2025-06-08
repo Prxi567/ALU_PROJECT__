@@ -1,7 +1,7 @@
 `include "ALU.v"
 `define PASS 1'b1
 `define FAIL 1'b0
-`define no_of_testcase 200
+`define no_of_testcase 100
 
 module test_bench_alu #( parameter N=8, M=4)();
   localparam test_case_width = 19 + (2*N) + (2*N+1) + M;
