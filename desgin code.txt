@@ -1,4 +1,4 @@
-module ALU #(parameter N = 8, parameter M = 4,parameter width=2*N) (
+module ALU #(parameter N = 8, parameter M = 4) (
     input [N-1:0] A, B,
     input clk, rst, cin, ce, mode,
     input [1:0] valid,
