@@ -22,7 +22,7 @@ wire signed [N-1:0] signed_A = next_A;
 wire signed [N-1:0] signed_B = next_B;
 reg signed [2*N:0] signed_result;
 
-reg [2*N:0] next_result;
+reg [2*N:0] next_result,temp_res;
 reg next_cout, next_g, next_l, next_e, next_err, next_oflow;
 
 always @(posedge clk or posedge rst) begin
@@ -230,7 +230,8 @@ always @(posedge clk or posedge rst) begin
         err <= 0;
     end else if (ce) begin
         if ((next_cmd == 9 || next_cmd == 10) && next_mode) begin
-            result <= next_result;
+            temp res<= next_result;
+            rseult<= temp_res;
         end else begin
             result <= next_result;
         end
