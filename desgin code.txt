@@ -1,9 +1,9 @@
-module ALU #(parameter N = 8, parameter M = 4) (
+module ALU #(parameter N = 8, parameter M = 4,res_width=2*N) (
     input [N-1:0] A, B,
     input clk, rst, cin, ce, mode,
     input [1:0] valid,
     input [M-1:0] cmd,
-    output reg [2*N:0] result = 16'd0,
+    output reg [res_width:0] result = 16'd0,
     output reg carry_out = 1'b0,
     output reg overflow = 1'b0,
     output reg gt = 1'b0,
