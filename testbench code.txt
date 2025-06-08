@@ -3,7 +3,7 @@
 `define FAIL 1'b0
 `define no_of_testcase 200
 
-module test_bench_alu #(parameter N=8, M=4, res_width = 2*N)();
+module test_bench_alu #(parameter N=8, M=4,)();
   localparam test_case_width = 19 + (2*N) + (2*N+1) + M;
   localparam response_width = test_case_width + 6 + (2*N) + 1;
   localparam result_width = (2*N) + 1 + 6;
